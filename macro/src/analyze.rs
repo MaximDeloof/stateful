@@ -50,6 +50,8 @@ pub struct StateMachine {
     pub visibility: Visibility,
     /// Optional `on_transition` callback.
     pub on_transition: Option<Path>,
+    /// Optional `on_transition_async` callback.
+    pub on_transition_async: Option<Path>,
     /// Optional `on_dispatch` callback.
     pub on_dispatch: Option<Path>,
 }
@@ -180,6 +182,7 @@ pub fn analyze_state_machine(attribute_args: &AttributeArgs, item_impl: &ItemImp
     let mut superstate_derives = Vec::new();
 
     let mut on_transition = None;
+    let mut on_transition_async = None;
     let mut on_dispatch = None;
 
     let mut visibility = parse_quote!(pub);
@@ -220,6 +223,14 @@ pub fn analyze_state_machine(attribute_args: &AttributeArgs, item_impl: &ItemImp
                 if name_value.path.is_ident("on_transition") =>
             {
                 on_transition = match &name_value.lit {
+                    Lit::Str(input_pat) => Some(input_pat.parse().unwrap()),
+                    _ => abort!(name_value, "must be a string literal"),
+                }
+            }
+            NestedMeta::Meta(Meta::NameValue(name_value))
+                if name_value.path.is_ident("on_transition_async") =>
+            {
+                on_transition_async = match &name_value.lit {
                     Lit::Str(input_pat) => Some(input_pat.parse().unwrap()),
                     _ => abort!(name_value, "must be a string literal"),
                 }
@@ -341,6 +352,7 @@ pub fn analyze_state_machine(attribute_args: &AttributeArgs, item_impl: &ItemImp
         superstate_derives,
         on_dispatch,
         on_transition,
+        on_transition_async,
         event_ident,
         context_ident,
         visibility,
@@ -660,6 +672,7 @@ fn valid_state_analyze() {
         superstate_ident,
         superstate_derives,
         on_transition,
+        on_transition_async: None,
         on_dispatch,
         event_ident,
         context_ident,

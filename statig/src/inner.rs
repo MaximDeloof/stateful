@@ -1,3 +1,4 @@
+use crate::awaitable::IntoStateMachineExt;
 #[cfg(feature = "async")]
 use crate::awaitable::{self, StateExt as _};
 use crate::blocking::{self, StateExt as _};
@@ -58,7 +59,7 @@ where
 #[cfg(feature = "async")]
 impl<M> Inner<M>
 where
-    M: IntoStateMachine + Send,
+    M: IntoStateMachineExt,
     for<'evt> M::Event<'evt>: Send + Sync,
     for<'ctx> M::Context<'ctx>: Send + Sync,
     M::State: awaitable::State<M> + Send + 'static,
@@ -106,6 +107,7 @@ where
             .await;
 
         M::ON_TRANSITION(&mut self.shared_storage, &target, &self.state);
+        M::ON_TRANSITION_ASYNC(&mut self.shared_storage, &target, &self.state).await;
     }
 }
 

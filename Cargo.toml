@@ -18,6 +18,7 @@ members = [
 
     "examples/no_macro/basic",
     "examples/no_macro/blinky",
+    "examples/no_macro/blinky_async",
     "examples/no_macro/bench",
     "examples/no_macro/history",
     "examples/no_macro/calculator",

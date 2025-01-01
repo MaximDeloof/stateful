@@ -1,3 +1,5 @@
+use core::{future::Future, pin::Pin};
+
 use crate::StateOrSuperstate;
 
 /// Trait for transorming a type into a state machine.
@@ -29,4 +31,14 @@ where
 
     /// Method that is called *after* every transition.
     const ON_TRANSITION: fn(&mut Self, &Self::State, &Self::State) = |_, _, _| {};
+
+    const ON_TRANSITION_ASYNC: for<'fut> fn(
+        &'fut mut Self,
+        from: &'fut Self::State,
+        to: &'fut Self::State,
+    )
+        -> Pin<Box<dyn Future<Output = ()> + Send + 'fut>> = |_, _, _| {
+        use std::task::Poll;
+        Box::pin(std::future::poll_fn(|_| Poll::Ready(())))
+    };
 }

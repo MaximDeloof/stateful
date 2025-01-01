@@ -1,9 +1,12 @@
 #![allow(unused)]
 
 use futures::executor;
+use futures::future::poll_fn;
 use statig::prelude::*;
 use std::fmt::Debug;
+use std::future::Future;
 use std::io::Write;
+use std::pin::Pin;
 use std::thread::spawn;
 
 #[derive(Debug, Default)]
@@ -29,6 +32,8 @@ pub enum Event {
     superstate(derive(Debug)),
     // Set the `on_transition` callback.
     on_transition = "Self::on_transition",
+    // Set the `on_transition_async` callback.
+    on_transition_async = "Self::on_transition_async",
     // Set the `on_dispatch` callback.
     on_dispatch = "Self::on_dispatch"
 )]
@@ -81,6 +86,19 @@ impl Blinky {
     // The `on_transition` callback that will be called after every transition.
     fn on_transition(&mut self, source: &State, target: &State) {
         println!("transitioned from `{source:?}` to `{target:?}`");
+    }
+
+    async fn transitioning(&mut self, from: &State, to: &State) {
+        println!("transitioning from {:?} to {:?}", from, to);
+    }
+
+    fn on_transition_async<'a>(
+        &'a mut self,
+        source: &'a State,
+        target: &'a State,
+    ) -> Pin<Box<dyn Future<Output = ()> + Send + 'a>> {
+        println!("transitioned async from `{source:?}` to `{target:?}`");
+        Box::pin(self.transitioning(source, target))
     }
 
     fn on_dispatch(&mut self, state: StateOrSuperstate<Self>, event: &Event) {

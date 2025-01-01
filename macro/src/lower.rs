@@ -58,6 +58,8 @@ pub struct StateMachine {
     pub superstate_generics: Generics,
     /// The path of the `on_transition` callback.
     pub on_transition: Option<Path>,
+    /// The path of the `on_transition_async` callback.
+    pub on_transition_async: Option<Path>,
     /// The path of the `on_dispatch` callback.
     pub on_dispatch: Option<Path>,
     /// The visibility for the derived types,
@@ -137,6 +139,8 @@ pub fn lower(model: &Model) -> Ir {
     let state_ident = model.state_machine.state_ident.clone();
     let superstate_ident = model.state_machine.superstate_ident.clone();
     let on_transition = model.state_machine.on_transition.clone();
+
+    let on_transition_async = model.state_machine.on_transition_async.clone();
     let on_dispatch = model.state_machine.on_dispatch.clone();
     let event_ident = model.state_machine.event_ident.clone();
     let context_ident = model.state_machine.context_ident.clone();
@@ -421,6 +425,7 @@ pub fn lower(model: &Model) -> Ir {
         superstate_derives,
         superstate_generics,
         on_transition,
+        on_transition_async,
         on_dispatch,
         visibility,
         event_ident,
@@ -708,6 +713,7 @@ fn create_analyze_state_machine() -> analyze::StateMachine {
         superstate_ident: parse_quote!(Superstate),
         superstate_derives: vec![parse_quote!(Copy), parse_quote!(Clone)],
         on_transition: None,
+        on_transition_async: None,
         on_dispatch: None,
         visibility: parse_quote!(pub),
         event_ident: parse_quote!(input),
@@ -733,6 +739,7 @@ fn create_lower_state_machine() -> StateMachine {
         superstate_derives: vec![parse_quote!(Copy), parse_quote!(Clone)],
         superstate_generics,
         on_transition: None,
+        on_transition_async: None,
         on_dispatch: None,
         visibility: parse_quote!(pub),
         event_ident: parse_quote!(input),

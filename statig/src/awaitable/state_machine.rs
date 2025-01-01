@@ -1,14 +1,11 @@
 use core::fmt::Debug;
 
-use super::awaitable;
+use super::{awaitable, State, Superstate};
 use crate::{Inner, IntoStateMachine};
 
 /// A state machine where the shared storage is of type `Self`.
-pub trait IntoStateMachineExt: IntoStateMachine
-where
-    Self: Send,
-    for<'sub> Self::Superstate<'sub>: awaitable::Superstate<Self> + Send,
-    Self::State: awaitable::State<Self> + Send,
+pub trait IntoStateMachineExt:
+    for<'sub> IntoStateMachine<Superstate<'sub>: Superstate<Self> + Send, State: State<Self>> + Send
 {
     /// Create a state machine that will be lazily initialized.
     fn state_machine(self) -> StateMachine<Self>
@@ -36,11 +33,8 @@ where
     }
 }
 
-impl<T> IntoStateMachineExt for T
-where
-    Self: IntoStateMachine + Send,
-    for<'sub> Self::Superstate<'sub>: awaitable::Superstate<Self> + Send,
-    Self::State: awaitable::State<Self> + Send,
+impl<T> IntoStateMachineExt for T where
+    T: for<'sub> IntoStateMachine<State: State<T>, Superstate<'sub>: Superstate<T> + Send> + Send
 {
 }
 
@@ -55,7 +49,7 @@ where
 
 impl<M> StateMachine<M>
 where
-    M: IntoStateMachine + Send,
+    M: IntoStateMachineExt,
     M::State: awaitable::State<M> + 'static + Send,
     for<'sub> M::Superstate<'sub>: awaitable::Superstate<M> + Send,
 {
@@ -233,21 +227,21 @@ where
 /// A state machine that has been initialized.
 pub struct InitializedStateMachine<M>
 where
-    M: IntoStateMachine,
+    M: IntoStateMachineExt,
 {
     inner: Inner<M>,
 }
 
 impl<M> InitializedStateMachine<M>
 where
-    M: IntoStateMachine + Send,
+    M: IntoStateMachineExt,
     M::State: awaitable::State<M> + 'static + Send,
     for<'sub> M::Superstate<'sub>: awaitable::Superstate<M> + Send,
 {
     /// Handle the given event.
     pub async fn handle(&mut self, event: &M::Event<'_>)
     where
-        for<'ctx> M: IntoStateMachine<Context<'ctx> = ()>,
+        for<'ctx> M: IntoStateMachineExt<Context<'ctx> = ()>,
         for<'evt> M::Event<'evt>: Send + Sync,
         for<'ctx> M::Context<'ctx>: Send + Sync,
     {
@@ -257,7 +251,7 @@ where
     /// Handle the given event.
     pub async fn handle_with_context(&mut self, event: &M::Event<'_>, context: &mut M::Context<'_>)
     where
-        M: IntoStateMachine,
+        M: IntoStateMachineExt,
         for<'evt> M::Event<'evt>: Send + Sync,
         for<'ctx> M::Context<'ctx>: Send + Sync,
     {
@@ -290,7 +284,7 @@ where
 
 impl<M> Clone for InitializedStateMachine<M>
 where
-    M: IntoStateMachine + Clone,
+    M: IntoStateMachineExt + Clone,
     M::State: Clone,
 {
     fn clone(&self) -> Self {
@@ -302,7 +296,7 @@ where
 
 impl<M> Debug for InitializedStateMachine<M>
 where
-    M: IntoStateMachine + Debug,
+    M: IntoStateMachineExt + Debug,
     M::State: Debug,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -315,7 +309,7 @@ where
 
 impl<M> PartialEq for InitializedStateMachine<M>
 where
-    M: IntoStateMachine + PartialEq,
+    M: IntoStateMachineExt + PartialEq,
     M::State: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -325,14 +319,14 @@ where
 
 impl<M> Eq for InitializedStateMachine<M>
 where
-    M: IntoStateMachine + PartialEq + Eq,
-    M::State: PartialEq + Eq,
+    M: IntoStateMachineExt + Eq,
+    M::State: Eq,
 {
 }
 
 impl<M> core::ops::Deref for InitializedStateMachine<M>
 where
-    M: IntoStateMachine,
+    M: IntoStateMachineExt,
 {
     type Target = M;
 
@@ -379,16 +373,14 @@ where
 /// execute all the entry actions into the initial state.
 pub struct UninitializedStateMachine<M>
 where
-    M: IntoStateMachine,
+    M: IntoStateMachineExt,
 {
     inner: Inner<M>,
 }
 
 impl<M> UninitializedStateMachine<M>
 where
-    M: IntoStateMachine + Send,
-    M::State: awaitable::State<M> + 'static + Send,
-    for<'sub> M::Superstate<'sub>: awaitable::Superstate<M> + Send,
+    M: IntoStateMachineExt,
 {
     /// Initialize the state machine by executing all entry actions towards
     /// the initial state.
@@ -416,9 +408,10 @@ where
     /// ```
     pub async fn init(self) -> InitializedStateMachine<M>
     where
-        for<'ctx> M: IntoStateMachine<Context<'ctx> = ()>,
+        for<'ctx> M: IntoStateMachineExt<Context<'ctx> = ()>,
         for<'evt> M::Event<'evt>: Send + Sync,
         for<'ctx> M::Context<'ctx>: Send + Sync,
+        M::State: Send + 'static,
     {
         let mut state_machine = InitializedStateMachine { inner: self.inner };
         state_machine.inner.async_init_with_context(&mut ()).await;
@@ -453,6 +446,7 @@ where
     where
         for<'evt> M::Event<'evt>: Send + Sync,
         for<'ctx> M::Context<'ctx>: Send + Sync,
+        M::State: Send + 'static,
     {
         let mut state_machine = InitializedStateMachine { inner: self.inner };
         state_machine.inner.async_init_with_context(context).await;
@@ -462,7 +456,7 @@ where
 
 impl<M> Clone for UninitializedStateMachine<M>
 where
-    M: IntoStateMachine + Clone,
+    M: IntoStateMachineExt + Clone,
     M::State: Clone,
 {
     fn clone(&self) -> Self {
@@ -474,7 +468,7 @@ where
 
 impl<M> Debug for UninitializedStateMachine<M>
 where
-    M: IntoStateMachine + Debug,
+    M: IntoStateMachineExt + Debug,
     M::State: Debug,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -487,7 +481,7 @@ where
 
 impl<M> PartialEq for UninitializedStateMachine<M>
 where
-    M: IntoStateMachine + PartialEq,
+    M: IntoStateMachineExt + PartialEq,
     M::State: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -497,14 +491,14 @@ where
 
 impl<M> Eq for UninitializedStateMachine<M>
 where
-    M: IntoStateMachine + PartialEq + Eq,
-    M::State: PartialEq + Eq,
+    M: IntoStateMachineExt + PartialEq + Eq,
+    M::State: State<M> + PartialEq + Eq,
 {
 }
 
 impl<M> core::ops::Deref for UninitializedStateMachine<M>
 where
-    M: IntoStateMachine,
+    M: IntoStateMachineExt,
 {
     type Target = M;
 

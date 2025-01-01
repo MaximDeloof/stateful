@@ -1,0 +1,8 @@
+[package]
+name = "no_macro_blink_async"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+statig = { path = "../../../statig", features = ["async"] }
+tokio = { version = "*", features = ["full"] }
