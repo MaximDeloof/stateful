@@ -1,0 +1,37 @@
+error: Can not use `custom_state` with derives
+  --> tests/ui/custom_state_derive_error.rs:36:5
+   |
+36 |     state(custom_state, name = "CustomState", derive(Debug))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: the method `state_machine` exists for struct `Blinky`, but its trait bounds were not satisfied
+  --> tests/ui/custom_state_derive_error.rs:53:47
+   |
+6  | pub struct Blinky {}
+   | ----------------- method `state_machine` not found for this struct because it doesn't satisfy `Blinky: IntoStateMachine`, `Blinky: statig::awaitable::IntoStateMachineExt` or `Blinky: statig::blocking::IntoStateMachineExt`
+...
+53 |     let mut state_machine = Blinky::default().state_machine();
+   |                                               ^^^^^^^^^^^^^ method cannot be called on `Blinky` due to unsatisfied trait bounds
+   |
+   = note: the following trait bounds were not satisfied:
+           `Blinky: IntoStateMachine`
+           which is required by `Blinky: statig::awaitable::IntoStateMachineExt`
+           `Blinky: IntoStateMachine`
+           which is required by `Blinky: statig::blocking::IntoStateMachineExt`
+           `&Blinky: IntoStateMachine`
+           which is required by `&Blinky: statig::awaitable::IntoStateMachineExt`
+           `&Blinky: IntoStateMachine`
+           which is required by `&Blinky: statig::blocking::IntoStateMachineExt`
+           `&mut Blinky: IntoStateMachine`
+           which is required by `&mut Blinky: statig::awaitable::IntoStateMachineExt`
+           `&mut Blinky: IntoStateMachine`
+           which is required by `&mut Blinky: statig::blocking::IntoStateMachineExt`
+note: the trait `IntoStateMachine` must be implemented
+  --> src/into_state_machine.rs
+   |
+   | pub trait IntoStateMachine
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following traits define an item `state_machine`, perhaps you need to implement one of them:
+           candidate #1: `statig::awaitable::IntoStateMachineExt`
+           candidate #2: `statig::blocking::IntoStateMachineExt`

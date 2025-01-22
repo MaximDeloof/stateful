@@ -21,6 +21,7 @@ members = [
     "examples/no_macro/bench",
     "examples/no_macro/history",
     "examples/no_macro/calculator",
+    "examples/macro/custom_state",
 ]
 
 resolver = "2"

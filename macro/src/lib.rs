@@ -23,6 +23,7 @@ const CONTEXT_LIFETIME: &str = "'context";
 #[proc_macro_error]
 #[proc_macro_attribute]
 pub fn state_machine(args: TokenStream, input: TokenStream) -> TokenStream {
+    // CH: parsing args, need to add State here
     let attribute_args = parse_args(args.into());
     let item_impl = parse_input(input.into());
     let model = analyze(attribute_args, item_impl);

@@ -8,6 +8,8 @@ use syn::{
     Visibility,
 };
 
+use crate::lower::StateIdent;
+
 /// Model of the state machine.
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
 pub struct Model {
@@ -26,7 +28,7 @@ pub struct Model {
 /// General information regarding the state machine.
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
 pub struct StateMachine {
-    /// The inital state of the state machine.
+    /// The initial state of the state machine.
     pub initial_state: ExprCall,
     /// The type on which the state machine is implemented.
     pub shared_storage_type: Type,
@@ -35,7 +37,7 @@ pub struct StateMachine {
     /// The generics associated with the shared storage type.
     pub shared_storage_generics: Generics,
     /// The name for the state type.
-    pub state_ident: Ident,
+    pub state_ident: StateIdent,
     /// Derives that will be applied on the state type.
     pub state_derives: Vec<Path>,
     /// The name of the superstate type.
@@ -178,7 +180,6 @@ pub fn analyze_state_machine(attribute_args: &AttributeArgs, item_impl: &ItemImp
 
     let mut initial_state: Option<ExprCall> = None;
 
-    let mut state_ident = parse_quote!(State);
     let mut state_derives = Vec::new();
     let mut superstate_ident = parse_quote!(Superstate);
     let mut superstate_derives = Vec::new();
@@ -192,10 +193,12 @@ pub fn analyze_state_machine(attribute_args: &AttributeArgs, item_impl: &ItemImp
     let mut event_ident = parse_quote!(event);
     let mut context_ident = parse_quote!(context);
 
+    // CH: This just makes an empty thing for parsing?
     let mut state_meta: MetaList = parse_quote!(state());
+
     let mut superstate_meta: MetaList = parse_quote!(superstate());
 
-    // Iterate over the meta attribites on the `#[state_machine]` macro.
+    // Iterate over the meta attributes on the `#[state_machine]` macro.
     for arg in attribute_args {
         match arg {
             NestedMeta::Meta(Meta::NameValue(name_value))
@@ -282,7 +285,9 @@ pub fn analyze_state_machine(attribute_args: &AttributeArgs, item_impl: &ItemImp
         );
     };
 
-    // Iterate over the meta attributes for the state enum.
+    let mut custom_state = false;
+    let mut state_name: Option<Ident> = None;
+
     for meta in state_meta
         .nested
         .iter()
@@ -292,10 +297,13 @@ pub fn analyze_state_machine(attribute_args: &AttributeArgs, item_impl: &ItemImp
         })
     {
         match meta {
+            Meta::Path(name) if name.is_ident("custom_state") => {
+                custom_state = true;
+            }
             // Get the custom name for the state enum.
             Meta::NameValue(name_value) if name_value.path.is_ident("name") => {
-                state_ident = match &name_value.lit {
-                    Lit::Str(str_lit) => str_lit.parse().unwrap(),
+                state_name = match &name_value.lit {
+                    Lit::Str(str_lit) => Some(str_lit.parse().unwrap()),
                     _ => abort!(name_value, "expected string literal"),
                 }
             }
@@ -313,7 +321,21 @@ pub fn analyze_state_machine(attribute_args: &AttributeArgs, item_impl: &ItemImp
             }
 
             // Other attributes are not recognized.
-            _ => abort!(meta, "unknown attribute"),
+            _ => abort!(meta, "Unknown state attribute"),
+        }
+    }
+
+    let state_ident = state_name.map_or_else(
+        || StateIdent::StatigState(parse_quote!(State)),
+        |state_name| match custom_state {
+            true => StateIdent::CustomState(state_name),
+            false => StateIdent::StatigState(state_name),
+        },
+    );
+
+    if let StateIdent::CustomState(_) = state_ident {
+        if !state_derives.is_empty() {
+            abort!(state_meta, "Can not use `custom_state` with derives");
         }
     }
 
@@ -664,7 +686,7 @@ fn valid_state_analyze() {
     let shared_storage_path = parse_quote!(Blinky);
     let shared_storage_generics = parse_quote!();
 
-    let state_ident = parse_quote!(State);
+    let state_ident = StateIdent::StatigState(parse_quote!(State));
     let state_derives = vec![parse_quote!(Copy), parse_quote!(Clone)];
     let superstate_ident = parse_quote!(Superstate);
     let superstate_derives = vec![parse_quote!(Copy), parse_quote!(Clone)];

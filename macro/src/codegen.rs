@@ -11,7 +11,6 @@ pub fn codegen(ir: Ir) -> TokenStream {
     let item_impl = &ir.item_impl;
 
     let state_machine_impl = codegen_state_machine_impl(&ir);
-
     let state_enum = codegen_state(&ir);
     let state_impl = codegen_state_impl(&ir);
     let state_impl_state = codegen_state_impl_state(&ir);
@@ -44,7 +43,7 @@ fn codegen_state_machine_impl(ir: &Ir) -> ItemImpl {
         &ir.state_machine.shared_storage_generics.split_for_impl();
     let event_type = &ir.state_machine.event_type;
     let context_type = &ir.state_machine.context_type;
-    let state_ident = &ir.state_machine.state_ident;
+    let state_ident = &ir.state_machine.state_ident.as_ident();
     let (_, state_generics, _) = &ir.state_machine.state_generics.split_for_impl();
     let superstate_ident = &ir.state_machine.superstate_ident;
     let (_, superstate_generics, _) = &ir.state_machine.superstate_generics.split_for_impl();
@@ -104,8 +103,7 @@ fn codegen_state_machine_impl(ir: &Ir) -> ItemImpl {
     )
 }
 
-fn codegen_state(ir: &Ir) -> ItemEnum {
-    let state_ident = &ir.state_machine.state_ident;
+fn codegen_state(ir: &Ir) -> Option<ItemEnum> {
     let (state_generics, _, _) = &ir.state_machine.state_generics.split_for_impl();
     let state_derives = &ir.state_machine.state_derives;
 
@@ -116,16 +114,18 @@ fn codegen_state(ir: &Ir) -> ItemEnum {
         .collect();
     let visibility = &ir.state_machine.visibility;
 
-    parse_quote!(
-        #[derive(#(#state_derives),*)]
-        # visibility enum #state_ident #state_generics {
-            #(#variants),*
-        }
-    )
+    match &ir.state_machine.state_ident {
+        crate::lower::StateIdent::CustomState(_ident) => None,
+        crate::lower::StateIdent::StatigState(state_ident) => Some(parse_quote!(
+            #[derive(#(#state_derives),*)]
+            # visibility enum #state_ident #state_generics {
+                #(#variants),*
+            }
+        )),
+    }
 }
 
-fn codegen_state_impl(ir: &Ir) -> ItemImpl {
-    let state_ident = &ir.state_machine.state_ident;
+fn codegen_state_impl(ir: &Ir) -> Option<ItemImpl> {
     let (impl_generics, state_generics, _) = &ir.state_machine.state_generics.split_for_impl();
 
     let constructors: Vec<ItemFn> = ir
@@ -135,18 +135,21 @@ fn codegen_state_impl(ir: &Ir) -> ItemImpl {
         .cloned()
         .collect();
 
-    parse_quote!(
-        impl #impl_generics #state_ident #state_generics {
-            #(#constructors)*
-        }
-    )
+    match &ir.state_machine.state_ident {
+        crate::lower::StateIdent::CustomState(_ident) => None,
+        crate::lower::StateIdent::StatigState(state_ident) => Some(parse_quote!(
+            impl #impl_generics #state_ident #state_generics {
+                #(#constructors)*
+            }
+        )),
+    }
 }
 
 fn codegen_state_impl_state(ir: &Ir) -> ItemImpl {
     let shared_storage_type = &ir.state_machine.shared_storage_type;
     let (impl_generics, _, where_clause) =
         &ir.state_machine.shared_storage_generics.split_for_impl();
-    let state_ident = &ir.state_machine.state_ident;
+    let state_ident = &ir.state_machine.state_ident.as_ident();
     let (_, state_generics, _) = &ir.state_machine.state_generics.split_for_impl();
     let event_ident = &ir.state_machine.event_ident;
     let context_ident = &ir.state_machine.context_ident;
