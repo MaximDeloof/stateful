@@ -45,7 +45,7 @@ pub struct StateMachine {
     /// The type of the context.
     pub context_type: Type,
     /// The type of the state enum.
-    pub state_ident: Ident,
+    pub state_ident: StateIdent,
     /// Derives that will be applied on the state type.
     pub state_derives: Vec<Path>,
     /// The generics associated with the state type.
@@ -105,7 +105,7 @@ pub struct Superstate {
     /// The variant that will be part of the superstate enum
     /// (e.g. `Playing { led: &'mut bool }`).
     pub variant: Variant,
-    /// The pattern that we'll use to mactch on the superstate enum
+    /// The pattern that we'll use to match on the superstate enum
     /// (e.g. `Superstate::Playing { led }`).
     pub pat: Pat,
     /// The call to the superstate handler
@@ -133,6 +133,24 @@ pub struct Action {
 pub enum Mode {
     Awaitable,
     Blocking,
+}
+
+/// The state identifier.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StateIdent {
+    /// Represents an external user defined state type
+    CustomState(Ident),
+    /// Represents the state identifier
+    StatigState(Ident),
+}
+
+impl StateIdent {
+    pub(crate) fn as_ident(&self) -> Ident {
+        match self {
+            StateIdent::CustomState(ident) => ident.clone(),
+            StateIdent::StatigState(ident) => ident.clone(),
+        }
+    }
 }
 
 pub fn lower(model: &Model) -> Ir {
@@ -451,7 +469,7 @@ pub fn lower_state(state: &analyze::State, state_machine: &analyze::StateMachine
     let (_, shared_storage_type_generics, _) =
         &state_machine.shared_storage_generics.split_for_impl();
     let shared_storage_turbofish = shared_storage_type_generics.as_turbofish();
-    let state_name = &state_machine.state_ident;
+    let state_name = &state_machine.state_ident.as_ident();
 
     let mut variant_fields: Vec<_> = state
         .state_inputs
@@ -711,7 +729,7 @@ fn create_analyze_state_machine() -> analyze::StateMachine {
         shared_storage_type: parse_quote!(Blinky),
         shared_storage_path: parse_quote!(Blinky),
         shared_storage_generics: parse_quote!(),
-        state_ident: parse_quote!(State),
+        state_ident: StateIdent::StatigState(parse_quote!(State)),
         state_derives: vec![parse_quote!(Copy), parse_quote!(Clone)],
         superstate_ident: parse_quote!(Superstate),
         superstate_derives: vec![parse_quote!(Copy), parse_quote!(Clone)],
@@ -736,7 +754,7 @@ fn create_lower_state_machine() -> StateMachine {
         event_type: parse_quote!(()),
         context_type: parse_quote!(()),
         #[rustfmt::skip]
-        state_ident: parse_quote!(State),
+        state_ident: StateIdent::StatigState(parse_quote!(State)),
         state_derives: vec![parse_quote!(Copy), parse_quote!(Clone)],
         state_generics: Generics::default(),
         superstate_ident: parse_quote!(Superstate),
